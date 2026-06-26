@@ -220,32 +220,59 @@ async def query_llm(
         return None
 
     try:
-        # Import here to avoid import errors when API key is not set
-        import google.generativeai as genai
+        # Try the new google-genai SDK first, fall back to legacy
+        try:
+            from google import genai
+            # pyrefly: ignore [missing-import]
+            from google.genai import types
 
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        model = genai.GenerativeModel(
-            model_name=settings.MODEL_NAME,
-            system_instruction=SYSTEM_PROMPT,
-        )
+            client = genai.Client(api_key=settings.GEMINI_API_KEY)
+            user_prompt = _build_user_prompt(request, pre_analysis)
 
-        user_prompt = _build_user_prompt(request, pre_analysis)
-
-        # Run the synchronous SDK call in a thread pool with timeout
-        loop = asyncio.get_event_loop()
-        response = await asyncio.wait_for(
-            loop.run_in_executor(
-                None,
-                lambda: model.generate_content(
-                    user_prompt,
-                    generation_config=genai.GenerationConfig(
-                        response_mime_type="application/json",
-                        temperature=0.2,
+            # Run the synchronous SDK call in a thread pool with timeout
+            loop = asyncio.get_event_loop()
+            response = await asyncio.wait_for(
+                loop.run_in_executor(
+                    None,
+                    lambda: client.models.generate_content(
+                        model=settings.MODEL_NAME,
+                        contents=user_prompt,
+                        config=types.GenerateContentConfig(
+                            system_instruction=SYSTEM_PROMPT,
+                            response_mime_type="application/json",
+                            temperature=0.2,
+                        ),
                     ),
                 ),
-            ),
-            timeout=settings.LLM_TIMEOUT_SECONDS,
-        )
+                timeout=settings.LLM_TIMEOUT_SECONDS,
+            )
+
+        except ImportError:
+            # Fall back to legacy SDK
+            # pyrefly: ignore [missing-import]
+            import google.generativeai as genai
+
+            genai.configure(api_key=settings.GEMINI_API_KEY)
+            model = genai.GenerativeModel(
+                model_name=settings.MODEL_NAME,
+                system_instruction=SYSTEM_PROMPT,
+            )
+
+            user_prompt = _build_user_prompt(request, pre_analysis)
+            loop = asyncio.get_event_loop()
+            response = await asyncio.wait_for(
+                loop.run_in_executor(
+                    None,
+                    lambda: model.generate_content(
+                        user_prompt,
+                        generation_config=genai.GenerationConfig(
+                            response_mime_type="application/json",
+                            temperature=0.2,
+                        ),
+                    ),
+                ),
+                timeout=settings.LLM_TIMEOUT_SECONDS,
+            )
 
         if not response or not response.text:
             logger.warning("LLM returned empty response.")

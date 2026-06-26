@@ -142,9 +142,21 @@ async def analyze_ticket(request: TicketRequest) -> TicketResponse:
             safety_result.violations,
         )
 
-    # Force human review for certain conditions
-    if final_case_type == CaseType.phishing_or_social_engineering:
+    # Force human review for certain conditions based on rule-based engine logic
+    rule_human_review = True
+    if final_case_type == CaseType.refund_request and final_verdict == EvidenceVerdict.consistent:
+        rule_human_review = False
+    elif final_case_type == CaseType.payment_failed and final_verdict == EvidenceVerdict.consistent:
+        rule_human_review = False
+    elif final_case_type == CaseType.merchant_settlement_delay and final_verdict == EvidenceVerdict.consistent:
+        rule_human_review = False
+    elif final_case_type == CaseType.other and final_verdict == EvidenceVerdict.insufficient_data:
+        rule_human_review = False
+
+    if rule_human_review:
         human_review = True
+
+    # Also force human review for any high/critical severity inconsistent/insufficient_data cases
     if final_verdict in (EvidenceVerdict.inconsistent, EvidenceVerdict.insufficient_data):
         if final_severity in (Severity.high, Severity.critical):
             human_review = True
