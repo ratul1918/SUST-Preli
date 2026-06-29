@@ -6,7 +6,7 @@ This service implements a **hybrid architecture** combining a fast, deterministi
 
 ---
 
-## Features & Highlights
+## Features & Highlights 
 
 1. **The Investigator Twist (Evidence-based Reasoning)**: Instead of merely classifying text, the service cross-references the complaint details (amounts, counterparty details, and timestamps) against the customer's recent transaction history to determine if the claim is `consistent`, `inconsistent`, or contains `insufficient_data`.
 2. **Fintech Safety Guardrails**: Includes hard-coded post-processing rules to prevent critical violations:
